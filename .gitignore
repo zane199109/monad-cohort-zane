@@ -1,0 +1,32 @@
+# Ignore build artifacts, node_modules, etc.
+
+# Dependencies
+node_modules/
+
+# Build output
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Practice output
+practice/*/output/
+practice/*/cache/
+
+# Content drafts
+content/articles/draft/
