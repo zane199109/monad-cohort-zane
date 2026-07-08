@@ -53,7 +53,7 @@
 ---
 
 ### Day 3 — 钱包、安全与第一笔测试网交易
-**日期：** [填写日期]
+**日期：** 2026-07-08
 
 **学习内容：**
 - 安全与合规：https://web3intern.xyz/zh/security/
@@ -62,28 +62,46 @@
 - Block Explorers：https://docs.monad.xyz/tooling-and-infra/block-explorers
 
 **实操记录：**
-- [ ] 安装 MetaMask
-- [ ] 创建课程专用钱包
-- [ ] 备份助记词（⚠️ 绝不上传/截图/提交）
-- [ ] 添加 Monad Testnet
-- [ ] 获取测试币
-- [ ] 完成转账/交互
-- [ ] 在 explorer 中查看交易
+- [x] 安装 MetaMask（已有）
+- [x] 创建课程专用钱包
+- [x] 备份助记词（⚠️ 绝不上传/截图/提交）
+- [x] 添加 Monad Testnet
+- [x] 获取测试币（水龙头领取）
+- [x] 完成转账/交互（向 `0xc2dce...3c9d6` 转账 1 MONAD）
+- [x] 在 explorer 中查看交易
 
-**Transaction Hash：** 
-**Explorer 链接：** 
+**课程钱包地址：** `0x8EB3Fe3dDe56Cab0CDf32db3e6E5bA865596BE2C`
+**Monad Testnet Chain ID：** 10143
+**RPC：** https://testnet-rpc.monad.xyz/
+**Explorer：** https://testnet.monadexplorer.com/
+**当前余额：** ~98.94 MONAD
+
+**第一笔交易详情：**
+- Tx Hash: `0x0ef6c69cc45f222ac706e78ac472f925f094089697ec9e34eda7802141bc2458`
+- 转账金额: 1 MONAD
+- 接收地址: `0xc2dced1736ca4a6e8de57407b45adca06683c9d6`
+- 状态: ✅ 成功
+- 手续费: 0.002172 MONAD (Gas 21,000 × 103.45 Gwei)
+- 区块高度: 42,736,505
+- 时间: 2026-07-06 17:02:48
+- 交易类型: EIP-1559 简单转账 (input: 0x)
+- Nonce: 0 (该地址第一笔交易)
 
 **关键收获：**
-- 
+- 课程钱包要与主力钱包分离，这是安全第一原则
+- Monad Testnet 的 Chain ID 是 10143，区别于其他 EVM 链
+- 通过 RPC 可以直接查询余额，区块浏览器则提供更丰富的可视化信息
+- 区块浏览器（Explorer）是链上世界的"搜索引擎"，可以查地址、交易、合约
 
 **截图/链接：**
-- 
+- 提交文档：tasks/general/week-1/wallet-setup-monad-testnet.md
+- Explorer 链接：https://testnet.monadexplorer.com/address/0x8EB3Fe3dDe56Cab0CDf32db3e6E5bA865596BE2C
 
 **遇到的问题：**
-- 
+- 区块浏览器 testnet.monadexplorer.com 需要浏览器访问（Cloudflare 保护，curl 无法直接访问）
 
 **修复过程：**
-- 
+- 使用 RPC 调用 eth_getBalance 替代浏览器查询，确认地址有效且有余额
 
 ---
 
