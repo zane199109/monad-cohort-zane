@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monad Builder Badge</title>
+  <link rel="stylesheet" href="./output.css">
+  <script src="./ethers.umd.min.js"></script>
+  <style>
+    /* Dark Web3 background — subtle radial gradients */
+    body {
+      background:
+        radial-gradient(ellipse at top, rgba(168, 85, 247, 0.15), transparent 60%),
+        radial-gradient(ellipse at bottom right, rgba(14, 165, 233, 0.12), transparent 60%),
+        #0b1220;
+    }
+    /* Glassmorphism utility */
+    .glass {
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    /* Custom scrollbar for log panel */
+    .log-scroll::-webkit-scrollbar { width: 8px; }
+    .log-scroll::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+    .log-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    .log-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    /* Custom scrollbar for page body (filter bar / horizontal scrollers) */
+    *::-webkit-scrollbar { height: 6px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    html, body { min-height: 100vh; }
+
+    /* Log drawer smooth transition */
+    #logDrawer {
+      width: 0;
+      transition: width 0.3s ease;
+    }
+    #logDrawer.open {
+      width: 20rem; /* w-80 */
+    }
+    @media (min-width: 1280px) {
+      #logDrawer.open {
+        width: 24rem; /* w-96 */
+      }
+    }
+
+    /* Main area smooth transition */
+    #mainArea {
+      transition: margin-right 0.3s ease;
+    }
+  </style>
+</head>
+<body class="text-slate-200 antialiased flex min-h-screen">
+
+  <!-- Main content column (left side, shrinks when drawer opens) -->
+  <div id="mainArea" class="flex-1 min-w-0 flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="glass sticky top-0 z-30 border-b border-slate-700/50">
+      <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center font-bold text-base shadow-lg shadow-purple-500/30">B</div>
+          <div>
+            <h1 class="text-lg font-semibold leading-tight bg-gradient-to-r from-brand-300 to-purple-300 bg-clip-text text-transparent">
+              Monad Builder Badge
+            </h1>
+            <p class="text-[11px] text-slate-400">On-chain credential · SBT · non-transferable</p>
+          </div>
+        </div>
+        <nav class="hidden md:flex items-center gap-5 text-sm">
+          <a href="#/" class="text-slate-300 hover:text-white transition">Home</a>
+          <a href="#/" class="text-slate-300 hover:text-white transition">My Badges</a>
+          <a href="#/badge/0" class="text-slate-300 hover:text-white transition">Tasks</a>
+          <a href="https://github.com" target="_blank" rel="noopener" class="text-slate-300 hover:text-white transition">Open Source</a>
+        </nav>
+        <div class="flex items-center gap-2">
+          <!-- Log toggle button (new) -->
+          <button id="toggleLogBtn"
+                  class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700/50 transition"
+                  title="Activity Log">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v11.5A2.25 2.25 0 004.25 18h11.5A2.25 2.25 0 0018 15.75V4.25A2.25 2.25 0 0015.75 2H4.25zM6 13.25V3.5h8v9.75a.75.75 0 01-.75.75H6.75a.75.75 0 01-.75-.75zm5.5-9a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3zm0 3a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3zm0 3a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+          <span id="netPill" class="px-2.5 py-1 rounded-full bg-slate-700/50 text-slate-400 font-mono text-[11px]">not connected</span>
+          <button id="connectBtn" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-md transition">
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Status bar -->
+    <div class="glass border-b border-slate-700/30">
+      <div class="max-w-7xl mx-auto px-6 py-2 grid grid-cols-3 gap-3 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-500 uppercase tracking-wider">Wallet</span>
+          <code id="account" class="font-mono text-slate-400 truncate flex-1">not connected</code>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-500 uppercase tracking-wider">Network</span>
+          <code id="chainId" class="font-mono text-slate-400">—</code>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-500 uppercase tracking-wider">Contract</span>
+          <code id="contractStatus" class="font-mono text-slate-400 truncate flex-1">not bound</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main content area (rendered by app.js based on hash route) -->
+    <main id="app" class="flex-1"></main>
+
+    <!-- Footer -->
+    <footer class="glass border-t border-slate-700/50 mt-auto">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+        <div class="flex flex-wrap items-center gap-4">
+          <span>Contract: <a href="https://testnet.monadexplorer.com/address/0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC" target="_blank" rel="noopener" class="font-mono text-brand-300 hover:underline">0x56c2…73CC ↗</a></span>
+          <a href="https://testnet.monadexplorer.com/" target="_blank" rel="noopener" class="hover:text-white transition">Monadscan ↗</a>
+          <a href="https://github.com" target="_blank" rel="noopener" class="hover:text-white transition">GitHub ↗</a>
+        </div>
+        <p class="text-slate-500">SBT series · non-transferable on-chain credentials on Monad Testnet</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Right-side log drawer (opens/closes on toggle) -->
+  <aside id="logDrawer" class="flex-shrink-0 border-l border-slate-700/60 bg-slate-900/95 glass flex flex-col min-h-screen overflow-hidden">
+    <!-- Drawer header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700/60 flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-slow"></span>
+        <span class="text-xs uppercase tracking-wider text-slate-300 font-semibold">Activity Log</span>
+      </div>
+      <button id="closeLogBtn"
+              class="text-slate-500 hover:text-slate-300 transition text-lg leading-none p-0.5 rounded hover:bg-slate-700/50"
+              title="Close">&times;</button>
+    </div>
+    <!-- Log entries -->
+    <div id="logContainer" class="log-scroll flex-1 overflow-y-auto px-4 py-3 space-y-1">
+      <div class="log-entry text-xs text-slate-500 font-mono py-0.5 leading-relaxed">
+        <span class="text-slate-600">--:--:--</span> ready
+      </div>
+    </div>
+    <!-- Clear button footer -->
+    <div class="px-4 py-2 border-t border-slate-700/50 flex-shrink-0 flex justify-between items-center">
+      <button id="clearLogBtn" class="text-xs text-slate-500 hover:text-slate-300 transition hover:underline">Clear log</button>
+      <span id="logCount" class="text-[10px] text-slate-600 font-mono">0 entries</span>
+    </div>
+  </aside>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
