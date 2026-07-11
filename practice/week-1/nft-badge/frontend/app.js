@@ -8,8 +8,22 @@ const ABI = [
   "function symbol() view returns (string)",
   "function owner() view returns (address)",
   "function nextBadgeTypeId() view returns (uint256)",
+  "function nextTokenId() view returns (uint256)",
   "function hasBadge(address account, uint256 typeId) view returns (bool)",
   "function mint(address to, uint256 typeId) returns (uint256)",
+  "function mintBatch(address to, uint256 typeId, uint256 amount)",
+  "function airdrop(uint256 typeId, address[] calldata recipients)",
+  "function createBadgeType(string memory name, string memory description, string memory uri) returns (uint256)",
+  "function createBadgeTypes(string[] calldata names, string[] calldata descriptions, string[] calldata uris) returns (uint256[])",
+  "function setMinter(address account, bool isMinter)",
+  "function minters(address) view returns (bool)",
+  "function tokensOfOwner(address owner) returns (uint256[])",
+  "function getBadgeType(uint256 typeId) view returns (string memory name, string memory description, string memory uri)",
+  "function tokenBadgeType(uint256) view returns (uint256)",
+  "function badgeCount(address, uint256) view returns (uint256)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "event BadgeTypeCreated(uint256 indexed typeId, string name, string uri)",
+  "event BadgeMinted(uint256 indexed tokenId, uint256 indexed typeId, address indexed to)",
 ];
 
 // --- Monad Testnet constants ---
@@ -22,7 +36,8 @@ const MONAD_TESTNET = {
 };
 const EXPLORER_TX = "https://testnet.monadexplorer.com/tx/";
 const EXPLORER_ADDR = "https://testnet.monadexplorer.com/address/";
-const DEFAULT_CONTRACT = "0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC";
+const DEFAULT_CONTRACT = "0xA4A736984104c206f9de526C4c782e9029DF5641";
+const API_BASE = "http://localhost:8082/api/claims";
 
 // --- Shared state ---
 const state = {
@@ -32,6 +47,7 @@ const state = {
   account: null,
   unlockedSet: new Set(),
   filter: { series: 'all', status: 'all', search: '' },
+  claimStatus: {}, // typeId → 'pending' | 'rejected' | 'minted' | ''
 };
 
 const $ = (id) => document.getElementById(id);
@@ -133,27 +149,37 @@ async function ensureMonadTestnet() {
   return ("0x" + net2.chainId.toString(16)).toLowerCase() === MONAD_TESTNET.chainId;
 }
 
-async function connect() {
+async function connect(force) {
+  force = force || false;
   if (!window.ethers) { log("ethers.js not loaded", { type: "error" }); return; }
   if (!window.ethereum) { log("MetaMask not found", { type: "error" }); return; }
   try {
-    log("requesting wallet connection...", { type: "info" });
-    const perms = await window.ethereum.request({
-      method: "wallet_requestPermissions",
-      params: [{ eth_accounts: {} }],
-    });
-    // Try multiple ways to get the account
-    let accs = [];
-    if (perms && perms[0] && perms[0].caveats) {
-      const allowed = perms[0].caveats.find((c) => c.name === "allowedAccounts");
-      if (allowed && allowed.value && allowed.value.length > 0) {
-        accs = allowed.value;
+    // If already connected and not forcing, just restore state
+    if (state.account && !force) {
+      state.provider = new ethers.providers.Web3Provider(window.ethereum);
+      state.signer = state.provider.getSigner();
+      const accs = await state.provider.listAccounts();
+      if (accs.length > 0) {
+        state.account = accs[0].toLowerCase();
+        updateAccountUI();
+        updateNetworkUI(true);
+        await bindContract(DEFAULT_CONTRACT);
+        await refreshUnlockStatus();
+        await refreshClaimStatuses();
+        await checkAdminRole();
+        log("restored connection", { type: "success" });
+        renderCurrentRoute();
+        return;
       }
     }
-    if (accs.length === 0) {
-      // Fallback: use eth_accounts directly
-      accs = await window.ethereum.request({ method: "eth_accounts" });
-    }
+
+    log("requesting wallet connection...", { type: "info" });
+
+    // eth_requestAccounts triggers MetaMask popup.
+    // After wallet_revokePermissions in disconnect(), it will show the
+    // account selector allowing the user to switch accounts.
+    const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+
     if (!accs || accs.length === 0) {
       log("no accounts selected", { type: "error" });
       return;
@@ -174,12 +200,40 @@ async function connect() {
     updateNetworkUI(true);
     await bindContract(DEFAULT_CONTRACT);
     await refreshUnlockStatus();
+    await refreshClaimStatuses();
+    await checkAdminRole();
     log("ready ✓", { type: "success" });
     renderCurrentRoute();
     // Open log drawer automatically on connect
     toggleLogDrawer();
   } catch (e) {
     log("connect error: " + e.message, { type: "error" });
+  }
+}
+
+// Disconnect wallet
+function disconnect() {
+  state.account = null;
+  state.provider = null;
+  state.signer = null;
+  state.contract = null;
+  state.unlockedSet = new Set();
+  state.isAdmin = false;
+  updateAccountUI();
+  updateNetworkUI(false);
+  bindContract(null);
+  // Hide admin link on disconnect
+  const adminLink = $("adminLink");
+  if (adminLink) adminLink.classList.add("hidden");
+  log("wallet disconnected", { type: "info" });
+  renderCurrentRoute();
+
+  // Revoke MetaMask permissions so next connect shows account selector
+  if (window.ethereum) {
+    window.ethereum.request({
+      method: "wallet_revokePermissions",
+      params: [{ eth_accounts: {} }],
+    }).catch(() => {/* older MetaMask ignores this */});
   }
 }
 
@@ -194,13 +248,23 @@ function updateAccountUI() {
   } else {
     el.textContent = "not connected";
     el.classList.add("text-slate-500");
-    el.classList.remove("text-emerald-400");
   }
   const btn = $("connectBtn");
-  if (btn && state.account) {
+  if (!btn) return;
+  if (state.account) {
     btn.textContent = state.account.slice(0, 6) + "\u2026" + state.account.slice(-4);
     btn.classList.remove("bg-brand-600", "hover:bg-brand-700");
     btn.classList.add("bg-emerald-600", "hover:bg-emerald-700");
+    btn.onclick = () => {
+      if (confirm("Disconnect wallet?")) {
+        disconnect();
+      }
+    };
+  } else {
+    btn.textContent = "Connect Wallet";
+    btn.classList.remove("bg-emerald-600", "hover:bg-emerald-700");
+    btn.classList.add("bg-brand-600", "hover:bg-brand-700");
+    btn.onclick = () => connect();
   }
 }
 
@@ -245,6 +309,38 @@ async function refreshUnlockStatus() {
     checked++;
   }));
   log("loaded: " + state.unlockedSet.size + "/" + BADGES.length + " badges", { type: "success" });
+}
+
+// Fetch claim status per badge from backend
+async function refreshClaimStatuses() {
+  state.claimStatus = {};
+  if (!state.account) return;
+  const { BADGES } = window.BADGE_DATA;
+  await Promise.all(BADGES.map(async (b) => {
+    try {
+      const url = API_BASE + "/check?user_addr=" + encodeURIComponent(state.account) + "&type_id=" + b.typeId;
+      const resp = await fetch(url);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.status) state.claimStatus[b.typeId] = data.status;
+    } catch (e) { /* ignore */ }
+  }));
+}
+
+// ============== Role detection ==============
+async function checkAdminRole() {
+  if (!state.account || !state.contract) return;
+  try {
+    const isM = await state.contract.minters(state.account);
+    state.isAdmin = isM;
+    log(isM ? "role: admin (minter)" : "role: user", { type: isM ? "success" : "info" });
+    // Show/hide admin nav link
+    const adminLink = $("adminLink");
+    if (adminLink) adminLink.classList.toggle("hidden", !isM);
+    renderCurrentRoute(); // re-render to show/hide admin UI
+  } catch (e) {
+    log("role check failed: " + e.message, { type: "error" });
+  }
 }
 
 // ============== Mint transaction ==============
@@ -313,8 +409,13 @@ function renderWall() {
     const q = state.filter.search.toLowerCase();
     badges = badges.filter((b) =>
       b.name.toLowerCase().includes(q) ||
+      b.description.toLowerCase().includes(q) ||
       b.unlockRule.toLowerCase().includes(q) ||
-      b.description.toLowerCase().includes(q));
+      (b.track || '').toLowerCase().includes(q) ||
+      (b.level || '').toLowerCase().includes(q) ||
+      (b.contribution || '').toLowerCase().includes(q) ||
+      b.series.toLowerCase().includes(q) ||
+      b.rarity.toLowerCase().includes(q));
   }
 
   const next = getNextUnlock(state.unlockedSet);
@@ -436,6 +537,8 @@ function renderBadgeCard(b) {
   const unlocked = state.unlockedSet.has(b.typeId);
   const borderColor = unlocked ? r.color : '#334155';
   const glow = unlocked ? r.glow : 'transparent';
+  const isMinter = state.isAdmin || false;
+  const cs = state.claimStatus[b.typeId] || ''; // pending / rejected / minted / ''
   return `
     <a href="#/badge/${b.typeId}"
        class="group rounded-xl border p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
@@ -453,6 +556,7 @@ function renderBadgeCard(b) {
         <span class="px-1.5 py-0.5 rounded" style="color:${s.color}; background:${s.color}20;">${s.label}</span>
         <span class="text-slate-500">${unlocked ? 'unlocked' : 'locked'}</span>
       </div>
+      ${!unlocked && state.account && !isMinter ? (cs === 'pending' ? `\n        <button disabled class="mt-2 w-full px-2 py-1 bg-amber-600/50 text-amber-300 text-[10px] rounded cursor-not-allowed">Pending Review</button>\n      ` : `\n        <button onclick="event.preventDefault(); event.stopPropagation(); openClaimModal(${b.typeId})" class="mt-2 w-full px-2 py-1 bg-brand-600 hover:bg-brand-500 text-white text-[10px] rounded transition">\n          ${cs === 'rejected' ? 'Resubmit Claim' : 'Submit Claim'}\n        </button>\n      `) : ''}
     </a>
   `;
 }
@@ -650,11 +754,93 @@ function levelByUnlocked(count) {
   return 'Newcomer';
 }
 
+// ============== Claim Modal ==============
+let claimModalOpen = false;
+let claimTypeId = 0;
+
+function openClaimModal(typeId) {
+  claimTypeId = typeId;
+  claimModalOpen = true;
+  const badge = window.BADGE_DATA.getBadge(typeId);
+  const name = badge ? badge.name : 'Badge #' + typeId;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'claimOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:center;justify-content:center;';
+
+  overlay.innerHTML = `
+    <div class="glass rounded-xl border border-slate-700 p-6 max-w-md w-full mx-4" style="background:rgba(15,23,42,0.95);">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-white">Submit Claim</h3>
+        <button onclick="closeClaimModal()" style="background:none;border:none;color:#94a3b8;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+      <p class="text-sm text-slate-400 mb-4">Apply for badge: <strong class="text-white">${escapeHtml(name)}</strong></p>
+      <form id="claimForm" onsubmit="submitClaim(event)">
+        <div class="mb-3">
+          <label class="block text-xs text-slate-500 mb-1">Proof URL (optional)</label>
+          <input id="claimNote" type="text" placeholder="GitHub repo, assignment link, etc."
+            class="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-md focus:ring-2 focus:ring-brand-500 outline-none text-slate-200" />
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition">Submit</button>
+          <button type="button" onclick="closeClaimModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+}
+
+function closeClaimModal() {
+  claimModalOpen = false;
+  const overlay = document.getElementById('claimOverlay');
+  if (overlay) overlay.remove();
+}
+
+async function submitClaim(e) {
+  e.preventDefault();
+  if (!state.account) { log('connect wallet first', { type: 'error' }); return; }
+
+  const note = document.getElementById('claimNote')?.value || '';
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  try {
+    const resp = await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_addr: state.account,
+        type_id: claimTypeId,
+        note: note,
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+
+    const result = await resp.json();
+    log('claim submitted: #' + result.id + ' (awaiting admin review)', { type: 'success' });
+    closeClaimModal();
+    // Re-check claim status for this badge so card shows "Pending Review"
+    state.claimStatus[claimTypeId] = 'pending';
+    renderCurrentRoute();
+  } catch (err) {
+    log('claim failed: ' + err.message, { type: 'error' });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit';
+  }
+}
+
 // ============== Boot ==============
 window.addEventListener("DOMContentLoaded", () => {
   // Wire up shared controls
-  const cb = $("connectBtn");
-  if (cb) cb.addEventListener("click", connect);
+  // connectBtn click handled dynamically in updateAccountUI()
 
   // Drawer toggle (header button + close button)
   const tlb = $("toggleLogBtn");
@@ -675,10 +861,16 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("hashchange", renderCurrentRoute);
   renderCurrentRoute();
 
-  // Auto-reload on account change / chain change
+  // Reconnect on account/chain change instead of full page reload
   if (window.ethereum) {
-    window.ethereum.on("accountsChanged", () => location.reload());
-    window.ethereum.on("chainChanged", () => location.reload());
+    window.ethereum.on("accountsChanged", (accounts) => {
+      if (accounts.length === 0) {
+        disconnect();
+      } else {
+        connect(true);
+      }
+    });
+    window.ethereum.on("chainChanged", () => connect(true));
   }
 });
 
@@ -690,4 +882,7 @@ window.shareBadge = shareBadge;
 window.copyCredentialLink = copyCredentialLink;
 window.exportBadge = exportBadge;
 window.mintBadge = mintBadge;
+window.openClaimModal = openClaimModal;
+window.closeClaimModal = closeClaimModal;
+window.disconnect = disconnect;
 window.toggleLogDrawer = toggleLogDrawer;

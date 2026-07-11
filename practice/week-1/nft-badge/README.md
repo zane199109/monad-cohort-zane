@@ -17,8 +17,10 @@ nft-badge/
 ├── frontend/                 # vanilla HTML + ethers.js v5
 │   ├── index.html
 │   ├── app.js
-│   └── style.css
-├── test/NFTBadge.t.sol       # 5 Foundry tests (all passing)
+│   ├── mock-data.js
+│   ├── output.css
+│   └── ethers.umd.min.js
+├── test/NFTBadge.t.sol       # 18 Foundry tests (all passing)
 ├── foundry.toml              # remaps @openzeppelin -> lib
 └── README.md
 ```
@@ -26,11 +28,16 @@ nft-badge/
 ## Contract overview
 
 - ERC721URIStorage + Ownable (OpenZeppelin v5)
-- Owner creates badge types (name / description / uri)
+- Owner creates badge types (`name` / `description` / `uri`)
 - Owner authorizes minters (`setMinter`)
-- Minters mint badges (`mint`) — uses `_safeMint`, validates type exists
+- Minters mint single badges (`mint`) — uses `_safeMint`, validates type exists
+- `mintBatch(to, typeId, amount)` — batch mint same type to one recipient
+- `airdrop(typeId, recipients[])` — one-to-many distribution
+- `createBadgeTypes(names[], descs[], uris[])` — batch create badge types
 - `hasBadge(addr, typeId)` — O(1) via `badgeCount` mapping
-- Events: `BadgeTypeCreated`, `BadgeMinted`, `MinterUpdated`
+- `tokensOfOwner(addr)` — returns all tokenIds owned by an address
+- `getBadgeType(typeId)` — returns name, description, uri
+- Events: `BadgeTypeCreated`, `BadgeTypesCreated`, `BadgeMinted`, `MinterUpdated`
 - Custom errors for gas efficiency
 
 ## Build & test
@@ -50,8 +57,8 @@ Full deploy + interaction walkthrough: see
 (step-by-step guide: [`deploy-guide.md`](../../../tasks/general/week-1/deploy-guide.md)).
 
 **Deployed contract (2026-07-09):**
-- Address: `0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC`
-- Explorer: https://testnet.monadexplorer.com/address/0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC
+- Address: `0xA4A736984104c206f9de526C4c782e9029DF5641`
+- Explorer: https://testnet.monadexplorer.com/address/0xA4A736984104c206f9de526C4c782e9029DF5641
 - Deploy tx: `0x3afd30bcd9924dec81ba5e81cbe1c11e57cc3e7014826a00f8d17891d5096822`
 - Block: `43251317`, gas used: `3889936` (~0.408 MON)
 
@@ -69,7 +76,7 @@ Monad Testnet: Chain ID `10143` (0x279f), RPC `https://testnet-rpc.monad.xyz/`.
 Using `cast` against the deployed contract above:
 
 ```bash
-CONTRACT=0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC
+CONTRACT=0xA4A736984104c206f9de526C4c782e9029DF5641
 RPC=https://testnet-rpc.monad.xyz/
 
 # --- read (no gas, no tx) ---
@@ -89,28 +96,117 @@ cast send $CONTRACT "createBadgeType(string,string,string)(uint256)" \
 cast send $CONTRACT "mint(address,uint256)(uint256)" \
   <your_addr> 0 \
   --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# Batch create badge types
+cast send $CONTRACT "createBadgeTypes(string[],string[],string[])(uint256[])" \
+  '[\"BadgeA\",\"BadgeB\"]' '[\"Desc A\",\"Desc B\"]' '[\"ipfs://QmA\",\"ipfs://QmB\"]' \
+  --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# Mint batch (same type, same recipient)
+cast send $CONTRACT "mintBatch(address,uint256,uint256)" \
+  <your_addr> 0 3 \
+  --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# Airdrop (one type, multiple recipients)
+cast send $CONTRACT "airdrop(uint256,address[])" \
+  0 '[<addr1>,<addr2>,<addr3>]' \
+  --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# Query tokens owned by address
+cast call $CONTRACT "tokensOfOwner(address)(uint256[])" <your_addr> --rpc-url $RPC
+
+# Query badge type details
+cast call $CONTRACT "getBadgeType(uint256)(string,string,string)" 0 --rpc-url $RPC
 ```
 
-## Run the frontend
+## Frontend (DApp)
 
-The frontend is a static page; just open it (or serve it) and point it at a
-deployed contract address:
+The frontend is a static page; serve it and connect a wallet:
 
 ```bash
 cd frontend
-python3 -m http.server 8080
-# open http://localhost:8080
+npx serve -p 8080
+# or: python3 -m http.server 8080
+# or: VS Code Live Server extension (right-click index.html → Open with Live Server)
 ```
 
-Usage:
-1. Click **Connect MetaMask** (use the Monad Testnet wallet)
-2. Paste the deployed `NFTBadge` address
-3. Owner: create badge types, set minters
-4. Minter: mint badges
-5. Query: check whether an address holds a badge of a given type
+Browser: open `http://localhost:8080`
 
-> The frontend uses ethers.js v5 via CDN and contains only the ABI surface
-> needed by this demo.
+### Prerequisites
+
+1. Install MetaMask browser extension (Chrome/Edge/Firefox)
+2. Add Monad Testnet to MetaMask:
+   - Chain ID: `10143` (0x279f)
+   - RPC URL: `https://testnet-rpc.monad.xyz/`
+   - Symbol: `MONAD`
+   - Block Explorer: `https://testnet.monadexplorer.com/`
+3. Ensure wallet has test MON (claim from Monad faucet)
+
+### Usage Steps
+
+1. Click **Connect Wallet** (top-right)
+   - MetaMask popup for authorization
+   - After connect: button shows address, network indicator turns green, Activity Log panel opens
+2. Contract auto-binds to `0x56c26B...73CC` on connect
+   - Manual bind: `bindContract("0xA4A736984104c206f9de526C4c782e9029DF5641")` in browser console
+3. **Badge Wall** — 12 badge cards displayed
+   - Unlocked: shows icon; Locked: lock icon + grayscale
+   - Each card shows name, description, rarity tag, series tag, status
+4. **Filters** — Series (All/Cohort/Hackathon/Open Source/DevRel), Status (All/Unlocked/Locked), Search box
+5. **Mint a Badge** — click a locked card → detail page → click **Mint this Badge**
+   - MetaMask confirms transaction → on-chain success → badge unlocks → Activity Log records tx hash (clickable link to Monad Explorer)
+6. **Activity Log** — right-side panel, time-ordered entries:
+   - Connection status, network switch, tx send/confirm, errors (red)
+   - Clear with "Clear log" button
+
+### Frontend ABI Coverage
+
+The frontend ABI includes all contract methods:
+- Read: `name`, `symbol`, `owner`, `nextBadgeTypeId`, `nextTokenId`, `hasBadge`, `balanceOf`, `tokenBadgeType`, `badgeCount`, `tokensOfOwner`, `getBadgeType`
+- Write: `mint`, `mintBatch`, `airdrop`, `createBadgeType`, `createBadgeTypes`, `setMinter`
+- Events: `BadgeTypeCreated`, `BadgeMinted`
+
+### Browser Console Quick Tests
+
+```javascript
+// All examples assume state.signer and state.contract are initialized after wallet connect
+
+// Single badge type creation
+state.contract.createBadgeType("TestBadge", "test description", "ipfs://QmTest");
+
+// Batch badge type creation
+state.contract.createBadgeTypes(["BadgeA","BadgeB"], ["Desc A","Desc B"], ["ipfs://QmA","ipfs://QmB"]);
+
+// Batch mint (same type, same recipient)
+state.contract.mintBatch(state.account, 0, 3);
+
+// Airdrop (one type, multiple recipients)
+state.contract.airdrop(0, ["0x8EB3Fe3dDe56Cab0CDf32db3e6E5bA865596BE2C", "0xA100000000000000000000000000000000000001"]);
+
+// Query tokens owned by address
+state.contract.tokensOfOwner(state.account).then(ids => console.log(ids));
+
+// Query badge type details
+state.contract.getBadgeType(0).then(info => console.log(info));
+```
+
+## Troubleshooting
+
+**Q: MetaMask doesn't pop up for transaction confirmation?**
+- Check you're on Monad Testnet
+- Check wallet has sufficient test MON
+
+**Q: Page shows "not connected"?**
+- Confirm MetaMask extension is enabled
+- Refresh the page
+
+**Q: Transaction fails?**
+- Check Activity Log for error messages
+- Verify caller has minter permission (owner must call `setMinter` first)
+
+**Q: Badge doesn't unlock after minting?**
+- Wait for confirmation (Monad Testnet ~1-2 seconds)
+- Refresh page to re-query `hasBadge` status
 
 ---
 
@@ -131,8 +227,10 @@ nft-badge/
 ├── frontend/                 # 原生 HTML + ethers.js v5
 │   ├── index.html
 │   ├── app.js
-│   └── style.css
-├── test/NFTBadge.t.sol       # 5 个 Foundry 测试（全部通过）
+│   ├── mock-data.js
+│   ├── output.css
+│   └── ethers.umd.min.js
+├── test/NFTBadge.t.sol       # 18 个 Foundry 测试（全部通过）
 ├── foundry.toml              # remaps @openzeppelin -> lib
 └── README.md
 ```
@@ -140,12 +238,17 @@ nft-badge/
 ## 合约概览
 
 - 继承 ERC721URIStorage + Ownable（OpenZeppelin v5）
-- Owner 创建徽章类型（name / description / uri）
+- Owner 创建徽章类型（`name` / `description` / `uri`）
 - Owner 授权铸造者（`setMinter`）
-- 授权者铸造徽章（`mint`）—— 使用 `_safeMint`，并校验类型是否存在
+- 铸造者铸造单个徽章（`mint`）—— 使用 `_safeMint`，校验类型是否存在
+- `mintBatch(to, typeId, amount)` — 批量铸造同类型给同一接收者
+- `airdrop(typeId, recipients[])` — 一对多分发
+- `createBadgeTypes(names[], descs[], uris[])` — 批量创建徽章类型
 - `hasBadge(addr, typeId)` —— 通过 `badgeCount` 映射实现 O(1) 查询
-- 事件：`BadgeTypeCreated`、`BadgeMinted`、`MinterUpdated`
-- 使用 custom error 以节省 gas
+- `tokensOfOwner(addr)` — 返回地址拥有的所有 tokenId
+- `getBadgeType(typeId)` — 返回 name, description, uri
+- 事件：`BadgeTypeCreated`、`BadgeTypesCreated`、`BadgeMinted`、`MinterUpdated`
+- 使用 custom error 节省 gas
 
 ## 编译与测试
 
@@ -163,8 +266,8 @@ forge test -vv
 [`tasks/general/week-1/monad-testnet-deploy.md`](../../../tasks/general/week-1/monad-testnet-deploy.md)。
 
 **已部署合约（2026-07-09）：**
-- 地址：`0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC`
-- 浏览器：https://testnet.monadexplorer.com/address/0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC
+- 地址：`0xA4A736984104c206f9de526C4c782e9029DF5641`
+- 浏览器：https://testnet.monadexplorer.com/address/0xA4A736984104c206f9de526C4c782e9029DF5641
 - 部署 tx：`0x3afd30bcd9924dec81ba5e81cbe1c11e57cc3e7014826a00f8d17891d5096822`
 - 区块：`43251317`，gas 消耗：`3889936`（约 0.408 MON）
 
@@ -182,7 +285,7 @@ Monad 测试网：Chain ID `10143` (0x279f)，RPC `https://testnet-rpc.monad.xyz
 用 `cast` 调用上面已部署的合约：
 
 ```bash
-CONTRACT=0x56c26B4Cb480f606AA030BFF6CA3b3887a5673CC
+CONTRACT=0xA4A736984104c206f9de526C4c782e9029DF5641
 RPC=https://testnet-rpc.monad.xyz/
 
 # --- read（不上链，不花 gas）---
@@ -202,23 +305,114 @@ cast send $CONTRACT "createBadgeType(string,string,string)(uint256)" \
 cast send $CONTRACT "mint(address,uint256)(uint256)" \
   <你的地址> 0 \
   --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# 批量创建徽章类型
+cast send $CONTRACT "createBadgeTypes(string[],string[],string[])(uint256[])" \
+  '[\"BadgeA\",\"BadgeB\"]' '[\"Desc A\",\"Desc B\"]' '[\"ipfs://QmA\",\"ipfs://QmB\"]' \
+  --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# 批量铸造（同类型，同一接收者）
+cast send $CONTRACT "mintBatch(address,uint256,uint256)" \
+  <你的地址> 0 3 \
+  --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# 空投（一种类型，多个接收者）
+cast send $CONTRACT "airdrop(uint256,address[])" \
+  0 '[<addr1>,<addr2>,<addr3>]' \
+  --rpc-url $RPC --private-key $PRIVATE_KEY
+
+# 查询地址拥有的代币
+cast call $CONTRACT "tokensOfOwner(address)(uint256[])" <你的地址> --rpc-url $RPC
+
+# 查询徽章类型详情
+cast call $CONTRACT "getBadgeType(uint256)(string,string,string)" 0 --rpc-url $RPC
 ```
 
-## 运行前端
+## 前端（DApp）
 
-前端是静态页面，直接打开（或用本地服务器）并填入已部署的合约地址即可：
+前端是静态页面，启动后连接钱包即可使用：
 
 ```bash
 cd frontend
-python3 -m http.server 8080
-# 浏览器打开 http://localhost:8080
+npx serve -p 8080
+# 或：python3 -m http.server 8080
+# 或：VS Code Live Server 插件（右键 index.html → Open with Live Server）
 ```
 
-使用步骤：
-1. 点击 **Connect MetaMask**（使用 Monad Testnet 钱包）
-2. 粘贴已部署的 `NFTBadge` 合约地址
-3. Owner：创建徽章类型、设置 minter
-4. Minter：铸造徽章
-5. 查询：检查某地址是否持有某类徽章
+浏览器打开 `http://localhost:8080`
 
-> 前端通过 CDN 引入 ethers.js v5，仅包含本 demo 所需的 ABI 接口。
+### 前置准备
+
+1. 安装 MetaMask 浏览器插件（Chrome/Edge/Firefox）
+2. 在 MetaMask 中添加 Monad 测试网：
+   - Chain ID: `10143` (0x279f)
+   - RPC URL: `https://testnet-rpc.monad.xyz/`
+   - Symbol: `MONAD`
+   - Block Explorer: `https://testnet.monadexplorer.com/`
+3. 确保钱包有足够的测试 MON（从 Monad 水龙头领取）
+
+### 使用步骤
+
+1. 点击右上角 **Connect Wallet**
+   - MetaMask 弹出授权请求，点击确认
+   - 连接成功后：按钮显示地址缩写，网络指示器变绿，右侧 Activity Log 面板自动展开
+2. 合约自动绑定到 `0x56c26B...73CC`
+   - 手动绑定：浏览器控制台执行 `bindContract("0xA4A736984104c206f9de526C4c782e9029DF5641")`
+3. **徽章墙** — 首页展示 12 个徽章卡片
+   - 已解锁：显示图标；未解锁：锁图标 + 灰化
+   - 每张卡片显示名称、描述、稀有度标签、系列标签、状态
+4. **筛选** — Series（All/Cohort/Hackathon/Open Source/DevRel）、Status（All/Unlocked/Locked）、搜索框
+5. **铸造徽章** — 点击未解锁的卡片 → 详情页 → 点击 **Mint this Badge**
+   - MetaMask 确认交易 → 上链成功 → 徽章解锁 → Activity Log 记录 tx hash（可点击跳转 Monad Explorer）
+6. **活动日志** — 右侧面板，按时间顺序记录：
+   - 连接状态、网络切换、交易发送/确认、错误信息（红色）
+   - 支持 "Clear log" 清空
+
+### 前端 ABI 覆盖
+
+前端 ABI 包含所有合约方法：
+- 读取：`name`, `symbol`, `owner`, `nextBadgeTypeId`, `nextTokenId`, `hasBadge`, `balanceOf`, `tokenBadgeType`, `badgeCount`, `tokensOfOwner`, `getBadgeType`
+- 写入：`mint`, `mintBatch`, `airdrop`, `createBadgeType`, `createBadgeTypes`, `setMinter`
+- 事件：`BadgeTypeCreated`, `BadgeMinted`
+
+### 浏览器控制台快速测试
+
+```javascript
+// 以下示例假设连接钱包后 state.signer 和 state.contract 已初始化
+
+// 创建单个徽章类型
+state.contract.createBadgeType("TestBadge", "test description", "ipfs://QmTest");
+
+// 批量创建徽章类型
+state.contract.createBadgeTypes(["BadgeA","BadgeB"], ["Desc A","Desc B"], ["ipfs://QmA","ipfs://QmB"]);
+
+// 批量铸造（同类型，同一接收者）
+state.contract.mintBatch(state.account, 0, 3);
+
+// 空投（一种类型，多个接收者）
+state.contract.airdrop(0, ["0x8EB3Fe3dDe56Cab0CDf32db3e6E5bA865596BE2C", "0xA100000000000000000000000000000000000001"]);
+
+// 查询地址拥有的代币
+state.contract.tokensOfOwner(state.account).then(ids => console.log(ids));
+
+// 查询徽章类型详情
+state.contract.getBadgeType(0).then(info => console.log(info));
+```
+
+## 常见问题
+
+**Q: MetaMask 没有弹出交易确认？**
+- 检查是否已连接到 Monad 测试网
+- 检查钱包是否有足够的测试 MON
+
+**Q: 页面显示 "not connected"？**
+- 确认 MetaMask 插件已启用
+- 刷新页面重试
+
+**Q: 交易失败？**
+- 查看 Activity Log 中的错误信息
+- 确认调用方有 minter 权限（需要 owner 调用 `setMinter` 授权）
+
+**Q: 徽章没有变为解锁状态？**
+- 等待交易确认（Monad 测试网通常 1-2 秒）
+- 刷新页面重新查询 `hasBadge` 状态

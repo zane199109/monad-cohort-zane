@@ -1,7 +1,10 @@
 # Compiler files
 cache/
 out/
-
+lib/
+foundry.lock
+build/
+broadcast/
 # Commonly ignored directories
 .logs/
 .ignore/

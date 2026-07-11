@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "../src/NFTBadge.sol";
+import "../contracts/NFTBadge.sol";
 
 /// @notice Deployment script for NFTBadge on Monad Testnet.
 /// @dev Run with:

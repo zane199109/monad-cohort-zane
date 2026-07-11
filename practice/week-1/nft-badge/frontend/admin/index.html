@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NFT Badge — Admin Panel</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(ellipse at top, rgba(168, 85, 247, 0.15), transparent 60%),
+                  radial-gradient(ellipse at bottom right, rgba(14, 165, 233, 0.12), transparent 60%),
+                  #0b1220;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    .glass {
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+
+    /* Header */
+    .header {
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      background: linear-gradient(to right, #a78bfa, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header .subtitle {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
+    .back-link {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: #e2e8f0; }
+
+    /* Container */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+    }
+
+    /* Filters */
+    .filter-bar {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 1.25rem;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .filter-group label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+    .filter-group input,
+    .filter-group select {
+      padding: 0.5rem 0.75rem;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .filter-group input:focus,
+    .filter-group select:focus {
+      border-color: #a855f7;
+    }
+    .filter-group input { width: 220px; }
+    .filter-group select { min-width: 120px; }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-secondary { background: #334155; color: #cbd5e1; }
+    .btn-secondary:hover { background: #475569; }
+
+    /* Stats */
+    .stats-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 140px;
+    }
+    .stat-card .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .stat-card .stat-label {
+      color: #94a3b8;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stat-total { background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); }
+    .stat-total .stat-value { color: #818cf8; }
+    .stat-pending { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); }
+    .stat-pending .stat-value { color: #fbbf24; }
+    .stat-minted { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); }
+    .stat-minted .stat-value { color: #34d399; }
+    .stat-rejected { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); }
+    .stat-rejected .stat-value { color: #f87171; }
+
+    /* Table */
+    .table-wrapper {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: rgba(30, 41, 59, 0.6); }
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    td {
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+      vertical-align: middle;
+    }
+    tbody tr { transition: background 0.15s; }
+    tbody tr:hover { background: rgba(99, 102, 241, 0.05); }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .addr-cell {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      word-break: break-all;
+    }
+    .note-cell {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #cbd5e1;
+    }
+    .note-cell:hover { overflow: visible; white-space: normal; position: relative; z-index: 10; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .status-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .status-minted { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .status-rejected { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+    .id-cell {
+      font-family: monospace;
+      color: #64748b;
+      font-size: 0.8rem;
+    }
+
+    .date-cell {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+
+    .action-cell { white-space: nowrap; }
+    .btn-sm {
+      padding: 0.3rem 0.65rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .btn-approve { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .btn-approve:hover { background: rgba(16, 185, 129, 0.35); }
+    .btn-reject { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .btn-reject:hover { background: rgba(239, 68, 68, 0.35); }
+    .tx-link {
+      font-size: 0.75rem;
+      color: #38bdf8;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .tx-link:hover { color: #7dd3fc; }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #64748b;
+    }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-state p { font-size: 0.85rem; }
+
+    .error-state {
+      text-align: center;
+      padding: 2rem;
+      color: #f87171;
+    }
+
+    /* Pagination */
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      margin-top: 0;
+      border-top: 1px solid rgba(51, 65, 85, 0.3);
+      background: rgba(15, 23, 42, 0.3);
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .page-info { font-size: 0.8rem; color: #94a3b8; }
+    .page-buttons { display: flex; gap: 0.25rem; align-items: center; }
+    .page-btn {
+      padding: 0.3rem 0.6rem;
+      border: 1px solid #334155;
+      background: rgba(30, 41, 59, 0.6);
+      color: #cbd5e1;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: all 0.15s;
+    }
+    .page-btn:hover:not(:disabled) { background: #334155; border-color: #475569; }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .page-btn.active { background: #6366f1; border-color: #6366f1; color: white; }
+    .page-jump { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #94a3b8; }
+    .page-jump input {
+      width: 55px;
+      padding: 0.3rem 0.5rem;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 0.8rem;
+      text-align: center;
+      outline: none;
+    }
+    .page-jump input:focus { border-color: #a855f7; }
+    .page-jump button {
+      padding: 0.3rem 0.6rem;
+      background: #334155;
+      border: none;
+      border-radius: 6px;
+      color: #cbd5e1;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    .page-jump button:hover { background: #475569; }
+
+    /* Refresh button */
+    #refreshBtn {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      padding: 0.6rem 1.2rem;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      transition: all 0.2s;
+    }
+    #refreshBtn:hover { background: #4f46e5; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    @media (max-width: 768px) {
+      .container { padding: 1rem; }
+      .filter-bar { flex-direction: column; }
+      .filter-group input { width: 100%; }
+      .stats-bar { gap: 0.5rem; }
+      .stat-card { min-width: auto; flex: 1; }
+      table { font-size: 0.8rem; }
+      th, td { padding: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header glass">
+    <div class="header-inner">
+      <div>
+        <h1>⚙️ Admin Panel</h1>
+        <div class="subtitle">Badge Claim Management — NFT Badge</div>
+      </div>
+      <a href="/" class="back-link">← Back to Badge Wall</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Filters -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label>Wallet Address</label>
+        <input id="filterAddr" type="text" placeholder="0x..." />
+      </div>
+      <div class="filter-group">
+        <label>Status</label>
+        <select id="filterStatus">
+          <option value="">All</option>
+          <option value="pending">Pending</option>
+          <option value="minted">Minted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Page Size</label>
+        <select id="filterPageSize">
+          <option value="10">10 / page</option>
+          <option value="20" selected>20 / page</option>
+          <option value="50">50 / page</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="applyFilters()">🔍 Search</button>
+      <button class="btn btn-secondary" onclick="resetFilters()">↺ Reset</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar" id="statsBar"></div>
+
+    <!-- Table -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px;">ID</th>
+            <th style="min-width:180px;">User Address</th>
+            <th style="width:60px;">Type</th>
+            <th>Note</th>
+            <th style="width:90px;">Status</th>
+            <th style="width:160px;">Created</th>
+            <th style="width:160px;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="claimsBody">
+          <tr><td colspan="7"><div class="empty-state"><div class="icon">⏳</div><p>Loading...</p></div></td></tr>
+        </tbody>
+      </table>
+      <div id="paginationBar"></div>
+    </div>
+  </div>
+
+  <button id="refreshBtn" onclick="loadClaims()">⟳ Refresh</button>
+
+  <script>
+    const API_BASE = 'http://localhost:8082/api/claims';
+    let state = { page: 1, pageSize: 20, status: '', addr: '' };
+    let totalPages = 1;
+    let totalClaims = 0;
+    let stats = { pending: 0, minted: 0, rejected: 0 };
+    let autoRefresh = setInterval(loadClaims, 10000);
+
+    function getQuery() {
+      const params = new URLSearchParams();
+      params.set('page', state.page);
+      params.set('pageSize', state.pageSize);
+      if (state.status) params.set('status', state.status);
+      if (state.addr) params.set('addr', state.addr);
+      return '?' + params.toString();
+    }
+
+    async function loadClaims() {
+      try {
+        const resp = await fetch(API_BASE + '/pending' + getQuery());
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const claims = data.data || [];
+        const tbody = document.getElementById('claimsBody');
+
+        totalPages = data.pages || 1;
+        totalClaims = data.total || 0;
+        stats = { pending: 0, minted: 0, rejected: 0 };
+        claims.forEach(c => { if (stats[c.status] !== undefined) stats[c.status]++; });
+
+        renderStats();
+
+        if (!claims || claims.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div><p>No claims found</p></div></td></tr>`;
+          renderPagination();
+          return;
+        }
+
+        tbody.innerHTML = claims.map(c => `
+          <tr>
+            <td class="id-cell">#${c.id}</td>
+            <td class="addr-cell">${c.user_addr}</td>
+            <td style="font-family:monospace;color:#cbd5e1;">${c.type_id}</td>
+            <td class="note-cell" title="${escapeHtml(c.note)}">${c.note || '—'}</td>
+            <td><span class="status-badge status-${c.status}">${c.status}</span></td>
+            <td class="date-cell">${new Date(c.created_at).toLocaleString()}</td>
+            <td class="action-cell">
+              ${c.status === 'pending'
+                ? `<button class="btn-sm btn-approve" onclick="approveClaim(${c.id})">✓ Mint</button>
+                   <button class="btn-sm btn-reject" onclick="rejectClaim(${c.id})">✗</button>`
+                : `<a class="tx-link" href="https://testnet.monadexplorer.com/tx/${c.tx_hash}" target="_blank">View ↗</a>`
+              }
+            </td>
+          </tr>
+        `).join('');
+
+        renderPagination();
+      } catch (err) {
+        document.getElementById('claimsBody').innerHTML = `<tr><td colspan="7"><div class="error-state">❌ ${escapeHtml(err.message)}</div></td></tr>`;
+      }
+    }
+
+    function renderStats() {
+      document.getElementById('statsBar').innerHTML = `
+        <div class="stat-card stat-total">
+          <div><div class="stat-value">${totalClaims}</div><div class="stat-label">Total</div></div>
+        </div>
+        <div class="stat-card stat-pending">
+          <div><div class="stat-value">${stats.pending}</div><div class="stat-label">Pending</div></div>
+        </div>
+        <div class="stat-card stat-minted">
+          <div><div class="stat-value">${stats.minted}</div><div class="stat-label">Minted</div></div>
+        </div>
+        <div class="stat-card stat-rejected">
+          <div><div class="stat-value">${stats.rejected}</div><div class="stat-label">Rejected</div></div>
+        </div>
+      `;
+    }
+
+    function renderPagination() {
+      const el = document.getElementById('paginationBar');
+      if (totalPages <= 1 && totalClaims === 0) { el.innerHTML = ''; return; }
+
+      let html = '<div class="pagination-bar">';
+      html += `<span class="page-info">Page ${state.page} of ${totalPages} · ${totalClaims} claims</span>`;
+      html += '<div class="page-buttons">';
+      html += `<button class="page-btn" onclick="goToPage(1)" ${state.page<=1?'disabled':''}>«</button>`;
+      html += `<button class="page-btn" onclick="goToPage(${state.page-1})" ${state.page<=1?'disabled':''}>‹</button>`;
+      html += `<button class="page-btn active" disabled>${state.page}</button>`;
+      html += `<button class="page-btn" onclick="goToPage(${state.page+1})" ${state.page>=totalPages?'disabled':''}>›</button>`;
+      html += `<button class="page-btn" onclick="goToPage(${totalPages})" ${state.page>=totalPages?'disabled':''}>»</button>`;
+      html += '</div>';
+      html += `<div class="page-jump">Go: <input type="number" id="jumpPage" min="1" max="${totalPages}" value="${state.page}" /> <button onclick="jumpToPage()">↵</button></div>`;
+      html += '</div>';
+      el.innerHTML = html;
+    }
+
+    function goToPage(p) {
+      state.page = Math.max(1, Math.min(p, totalPages));
+      loadClaims();
+    }
+
+    function jumpToPage() {
+      const inp = document.getElementById('jumpPage');
+      if (inp) goToPage(parseInt(inp.value) || 1);
+    }
+
+    function applyFilters() {
+      state.addr = document.getElementById('filterAddr').value.trim();
+      state.status = document.getElementById('filterStatus').value;
+      state.pageSize = parseInt(document.getElementById('filterPageSize').value) || 20;
+      state.page = 1;
+      loadClaims();
+    }
+
+    function resetFilters() {
+      document.getElementById('filterAddr').value = '';
+      document.getElementById('filterStatus').value = '';
+      document.getElementById('filterPageSize').value = '20';
+      state.addr = '';
+      state.status = '';
+      state.pageSize = 20;
+      state.page = 1;
+      loadClaims();
+    }
+
+    async function approveClaim(id) {
+      if (!confirm(`Approve claim #${id}? This will mint a badge on-chain.`)) return;
+      try {
+        const resp = await fetch(`${API_BASE}/${id}/approve`, { method: 'POST' });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+        const result = await resp.json();
+        alert(`✅ Minted! TX: ${result.tx_hash}`);
+        loadClaims();
+      } catch (err) {
+        alert(`❌ Error: ${err.message}`);
+      }
+    }
+
+    async function rejectClaim(id) {
+      if (!confirm(`Reject claim #${id}?`)) return;
+      try {
+        const resp = await fetch(`${API_BASE}/${id}/reject`, { method: 'POST' });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+        loadClaims();
+      } catch (err) {
+        alert(`❌ Error: ${err.message}`);
+      }
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Initial load
+    loadClaims();
+  </script>
+</body>
+</html>

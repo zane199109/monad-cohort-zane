@@ -1,0 +1,5 @@
+.env
+.env.*
+nft-badge.db
+bin/
+*.db

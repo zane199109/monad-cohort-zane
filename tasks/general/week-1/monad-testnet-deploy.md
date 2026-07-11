@@ -1,7 +1,7 @@
 # Week 1 — 部署 NFT Badge 合约到 Monad Testnet
 
 **轨道：** general  
-**对应任务：** Day 5 — Mini Demo 0 / 合约部署与交互  
+**对应任务：** Mini Demo 0 / 合约部署与交互  
 **日期：** 2026-07-09  
 **目标：** 走通完整链路：合约源码 → 编译 → 部署 → 合约地址 → read/write 调用 → 区块浏览器验证
 
