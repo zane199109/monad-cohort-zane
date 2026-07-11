@@ -53,8 +53,7 @@ Verified with Foundry nightly + Solc 0.8.35 + OpenZeppelin v5.6.1.
 ## Deploy to Monad Testnet
 
 Full deploy + interaction walkthrough: see
-[`tasks/general/week-1/monad-testnet-deploy.md`](../../../tasks/general/week-1/monad-testnet-deploy.md)
-(step-by-step guide: [`deploy-guide.md`](../../../tasks/general/week-1/deploy-guide.md)).
+[`tasks/general/week-1/monad-testnet-deploy.md`](../../../tasks/general/week-1/monad-testnet-deploy.md).
 
 **Deployed contract (2026-07-09):**
 - Address: `0xA4A736984104c206f9de526C4c782e9029DF5641`
