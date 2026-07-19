@@ -66,3 +66,12 @@ Dev（技术）
 - Frontend 开发（DApp 交互界面）
 - Ops 方向（项目宣传和文档整理）
 - Research 方向（竞品分析和协议对比）
+
+---
+
+## Week 2 实际产出
+
+- **Moss 开源项目深度研究**：9 篇 ADR + PR #31 全量 diff 分析（+5396/-4199 行，126 文件）
+- **Fetch-ABI CLI 实现**：Issue #28，17 个测试用例覆盖所有路径，依赖注入模式
+- **架构理解**：从旧架构（Plan/Expects/Effects）到新架构（Capability Tree/Receipt/ProtocolRef）的完整演进脉络
+- **安全设计分析**：三层安全机制（编译时 → 运行时 → 模拟时）

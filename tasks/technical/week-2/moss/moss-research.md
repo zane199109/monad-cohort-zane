@@ -2,7 +2,7 @@
 
 > ⭐ 已 Star Moss GitHub 仓库，截图如下：
 >
-> ![Star 截图](./images/star.png)
+> ![Star 截图](../images/star.png)
 
 ## 项目简介
 
