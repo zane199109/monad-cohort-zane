@@ -3,8 +3,7 @@
 **提交人：** zane199109 (庄祯)
 **Adapter 名称：** FastLane shMONAD Liquid Staking Protocol
 **PR 链接：** https://github.com/nishuzumi/moss/pull/116
-**状态：** ✅ Merged → upstream/adapter/fastlane
-**合并 Commit：** 97cc0765e0c0d9058a479fa0f0b0f53b8275d52e
+**状态：** ✅ Merged — merged by nishuzumi on 2026-07-21T08:41:57Z
 
 ---
 
@@ -81,10 +80,11 @@ packages/protocols/fastlane/
 
 ### 审查反馈处理
 
-PR 经过 nishuzumi 审查，修复了以下问题：
-- Focused ABI 的 deposit 函数缺少 assets 参数 → 补全签名
-- RequestUnstake.completionEpoch 类型错误为 uint64 → 改为 uint256
-- boostYield 参数数量不匹配 → 修正为 3 参数版本
+PR #116 经过 nishuzumi 审查，合并了 15 个文件（+7815/-0 行），包含：
+- 完整 Protocol 实现（5 Capabilities + 5 Queries + 5 Receipts）
+- ADR 0007 explorer tier ABI 溯源
+- 编译时类型安全证明（@ts-expect-error fixture）
+- 离线单元测试（14 tests）+ 链上验证测试
 
 ---
 
