@@ -1,6 +1,6 @@
 # Moss Protocol Adapter Challenge — 任务完成报告
 
-**提交人：** zane199109 (庄祯)
+**提交人：** zane199109
 **Adapter 名称：** FastLane shMONAD Liquid Staking Protocol
 **PR 链接：** https://github.com/nishuzumi/moss/pull/116
 **状态：** ✅ Merged — merged by nishuzumi on 2026-07-21T08:41:57Z
@@ -98,6 +98,3 @@ PR #116 经过 nishuzumi 审查，合并了 15 个文件（+7815/-0 行），包
 
 ---
 
-## Review / Merge 截图
-
-（待补充——PR 已合并到 upstream/adapter/fastlane）
